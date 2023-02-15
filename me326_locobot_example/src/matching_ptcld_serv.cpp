@@ -210,52 +210,56 @@ void Matching_Pix_to_Ptcld::color_image_callback(const sensor_msgs::Image::Const
 	cv::Mat hsv; 
 	cv::cvtColor(color_img_ptr->image, hsv, cv::COLOR_RGB2HSV); //example: https://cppsecrets.com/users/203110310511410511510410011599115495764103109971051084699111109/C00-OpenCv-cvcvtColor.php, and https://docs.opencv.org/3.4/d8/d01/group__imgproc__color__conversions.html
 	// Now generate lower and upper bounds of HSV to filter out cube of particular color (demonstrated - red filter)  
-  cv::Mat lower_bound = cv::Mat::zeros(hsv.size(), hsv.type());
-  cv::Mat upper_bound = cv::Mat::zeros(hsv.size(), hsv.type());
-  lower_bound.setTo(cv::Scalar(0, 100, 20));
-  upper_bound.setTo(cv::Scalar(5, 255, 255));
-  // Now generate and filter to make the mask:
-  cv::Mat mask;
-  cv::inRange(hsv, lower_bound, upper_bound, mask);
+	cv::Mat lower_bound = cv::Mat::zeros(hsv.size(), hsv.type());
+	cv::Mat upper_bound = cv::Mat::zeros(hsv.size(), hsv.type());
+	lower_bound.setTo(cv::Scalar(0, 100, 20));
+	upper_bound.setTo(cv::Scalar(5, 255, 255));
+	// Now generate and filter to make the mask:
+	cv::Mat mask;
+	cv::inRange(hsv, lower_bound, upper_bound, mask);
 
-  // ***NOW THIS CODE BELOW MAKES THE VERY STRONG ASSUMPTION THAT THERE IS ONLY ONE CUBE IN THE FIELD OF VIEW OF THE DESIRED COLOR IN THE MASK - IT AVERAGES THE MASK PIXELS TO FIND THE CENTER	
-  cv::Mat mask_img; //this is the result 	//Apply the mask; black region in the mask is 0, so when multiplied with original image removes all non-selected color
-  cv::bitwise_and(color_img_ptr->image, color_img_ptr->image, mask_img, mask); //https://docs.opencv.org/3.4/d2/de8/group__core__array.html#ga60b4d04b251ba5eb1392c34425497e14  
-	// Find the average pixel location
-  int count = 0;
-  int x = 0;
-  int y = 0;
-  for(int i = 0; i < mask_img.rows; i++)
-  {
-      for(int j = 0; j < mask_img.cols; j++)
-      {
-          if(mask_img.at<cv::Vec3b>(i, j) != cv::Vec3b(0, 0, 0))
-          {
-              count++;
-              x += i;
-              y += j;
-          }
-      }
-  }
-  x /= count;
-  y /= count;
-  // Turn the average pixel location white; Make the center point pixel bright so it shows up in this image
-  mask_img.at<cv::Vec3b>(x, y) = cv::Vec3b(255, 255, 255);
-	//Store this in global variable:  
-  uv_pix_.x = x; 
-  uv_pix_.y = y;
-  
-  //Publish the image (color img with mask applied)
-  cv_bridge::CvImage cv_bridge_mask_image;
-  cv_bridge_mask_image.header.stamp = ros::Time::now();
-  cv_bridge_mask_image.header.frame_id = msg->header.frame_id;
-  cv_bridge_mask_image.encoding = sensor_msgs::image_encodings::RGB8;//::MONO8;
-  cv_bridge_mask_image.image = mask_img;
-  sensor_msgs::Image ros_mask_image; //now convert from cv::Mat image back to ROS sensor_msgs image
-  cv_bridge_mask_image.toImageMsg(ros_mask_image);
-  image_color_filt_pub_.publish(ros_mask_image);
-  //Now show the cube location spherical marker: 
-  Matching_Pix_to_Ptcld::camera_cube_locator_marker_gen();
+	// ***NOW THIS CODE BELOW MAKES THE VERY STRONG ASSUMPTION THAT THERE IS ONLY ONE CUBE IN THE FIELD OF VIEW OF THE DESIRED COLOR IN THE MASK - IT AVERAGES THE MASK PIXELS TO FIND THE CENTER	
+	cv::Mat mask_img; //this is the result 	//Apply the mask; black region in the mask is 0, so when multiplied with original image removes all non-selected color
+	cv::bitwise_and(color_img_ptr->image, color_img_ptr->image, mask_img, mask); //https://docs.opencv.org/3.4/d2/de8/group__core__array.html#ga60b4d04b251ba5eb1392c34425497e14  
+		// Find the average pixel location
+	int count = 0;
+	int x = 0;
+	int y = 0;
+	for(int i = 0; i < mask_img.rows; i++)
+	{
+		for(int j = 0; j < mask_img.cols; j++)
+		{
+			if(mask_img.at<cv::Vec3b>(i, j) != cv::Vec3b(0, 0, 0))
+			{
+				count++;
+				x += i;
+				y += j;
+			}
+		}
+	}
+	if (count == 0) {
+		// Don't see red cube anymore
+		return;
+	}
+	x /= count;
+	y /= count;
+	// Turn the average pixel location white; Make the center point pixel bright so it shows up in this image
+	mask_img.at<cv::Vec3b>(x, y) = cv::Vec3b(255, 255, 255);
+		//Store this in global variable:  
+	uv_pix_.x = x; 
+	uv_pix_.y = y;
+	
+	//Publish the image (color img with mask applied)
+	cv_bridge::CvImage cv_bridge_mask_image;
+	cv_bridge_mask_image.header.stamp = ros::Time::now();
+	cv_bridge_mask_image.header.frame_id = msg->header.frame_id;
+	cv_bridge_mask_image.encoding = sensor_msgs::image_encodings::RGB8;//::MONO8;
+	cv_bridge_mask_image.image = mask_img;
+	sensor_msgs::Image ros_mask_image; //now convert from cv::Mat image back to ROS sensor_msgs image
+	cv_bridge_mask_image.toImageMsg(ros_mask_image);
+	image_color_filt_pub_.publish(ros_mask_image);
+	//Now show the cube location spherical marker: 
+	Matching_Pix_to_Ptcld::camera_cube_locator_marker_gen();
 }
 
 

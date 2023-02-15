@@ -9,7 +9,7 @@ class CubeDetector:
 
     def __init__(self) -> None:
         sub = rospy.Subscriber("/locobot/camera/color/image_raw/compressed", CompressedImage, self.camera_callback)
-        self.pub = rospy.Publisher("/locobot/cubes", Image, queue_size=1)
+        self.pub = rospy.Publisher("/locobot/cubes/compressed", CompressedImage, queue_size=1)
 
     def detect_cube(self, color_img, color_mask='r'):
         """Returns the black and white image with a color-mask for the specified color (white or the color where the color is, black everywhere else)
@@ -26,7 +26,7 @@ class CubeDetector:
         mask_img : np.ndarray
             Image with just the selected color shown (either with true color or white mask)
         """    
-        cv2.imwrite("raw_image.jpg", color_img)
+        # cv2.imwrite("raw_image.jpg", color_img)
         
         #Step 1: Convert to HSV space; OpenCV uses - H: 0-179, S: 0-255, V: 0-255
         hsv_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2HSV)
@@ -49,15 +49,15 @@ class CubeDetector:
         mask = cv2.inRange(hsv_img, (0, 0, 0), (255, 135, 255))
         mask = cv2.bitwise_not(mask)
         color_img = cv2.bitwise_and(color_img, color_img, mask=mask)
-        cv2.imwrite("test.jpg", cv2.cvtColor(color_img, cv2.COLOR_RGB2BGR))
+        cv2.imwrite("test.jpg", color_img)
 
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=lambda c: cv2.contourArea(c))[-10:]
         area = list(map(cv2.contourArea, contours))
         peri = list(map(lambda c: cv2.arcLength(c, True), contours))
         ratio = np.divide(area, peri)
-        idx = np.argpartition(ratio, -4)[-4:]
-        filtered = np.array(contours, dtype=object)[idx]
+        idx = np.argpartition(ratio, -min(len(ratio), 4))[-4:]
+        filtered = np.array(contours)[idx]
         mask = np.zeros_like(mask)
         mask = cv2.drawContours(mask, filtered, -1, 255, cv2.FILLED)
         hsv_img = cv2.bitwise_and(hsv_img, hsv_img, mask=mask)
@@ -80,7 +80,8 @@ class CubeDetector:
             np.vstack([r, b]),
             np.vstack([g, y])
         ])
-        big_msg = bridge.cv2_to_imgmsg(big)
+        # big_msg = bridge.cv2_to_imgmsg(big)
+        big_msg = bridge.cv2_to_compressed_imgmsg(big)
         # print(big.shape)
         self.pub.publish(big_msg)
 

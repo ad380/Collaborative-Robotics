@@ -12,6 +12,7 @@
     <arg name="show_lidar" value="$(arg show_lidar)" />
     <arg name="use_trajectory_controllers" value="$(arg use_trajectory_controllers)" />
     <arg name="robot_model" value="$(arg robot_model)" />
+    <arg name="paused" value="false"/>
   </include>
 
 
@@ -21,8 +22,6 @@
   <node type="locobot_control.py" name="locobot_control" pkg="me326_locobot_example" respawn="true" output="screen"/>
 
   <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="odom_broadcaster" args="0 0 0 0 0 0 locobot/odom locobot/base_link" /> -->
-
-  <!-- <node pkg="rosservice" type="rosservice" name="rosservice" args="call /gazebo/unpause_physics"/> -->
 
 </launch>
 
