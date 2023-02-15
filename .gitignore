@@ -48,4 +48,15 @@ qtcreator-*
 .#*
 
 # Catkin custom files
-CATKIN_IGNORE
+# CATKIN_IGNORE
+
+*/bags/*
+*.pyc
+*/_pycache__/*
+*.DS_Store
+*.vscode
+*.png
+*.jpeg
+*.jpg
+
+

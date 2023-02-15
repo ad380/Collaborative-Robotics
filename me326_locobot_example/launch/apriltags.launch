@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<!--This is an example, you will need to fix topics for your application -->
+<launch>
+    <arg name="camera" default="/camera/color"/>
+    <arg name="camera_frame" default="camera_color_optical_frame"/>
+    <arg name="image" default="image_raw"/>
+    <!-- <arg name="border_size" default="1"/> -->
+
+    <include file="$(find apriltag_ros)/launch/continuous_detection.launch">
+        <arg name="camera_name" value="$(arg camera)" />
+        <!-- <arg name="camera_frame" value="$(arg camera_frame)" /> -->
+        <arg name="image_topic" value="$(arg image)" />
+    </include>
+</launch>
