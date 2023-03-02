@@ -145,12 +145,35 @@ void Matching_Pix_to_Ptcld::info_callback(const sensor_msgs::CameraInfo::ConstPt
 	depth_cam_info_ready_ = true;	
 }
 
+std::string type2str(int type) {
+  std::string r;
+
+  uint8_t depth = type & CV_MAT_DEPTH_MASK;
+  uint8_t chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
+}
+
 void Matching_Pix_to_Ptcld::depth_callback(const sensor_msgs::Image::ConstPtr& msg){
 	//Take the depth message, using teh 32FC1 encoding and define the depth pointer
 	cv_bridge::CvImageConstPtr cv_ptr;
 	try
 	{
-		cv_ptr = cv_bridge::toCvShare(msg, "32FC1");
+		cv_ptr = cv_bridge::toCvShare(msg);
 	}
 	catch (cv_bridge::Exception& e)
 	{
@@ -159,7 +182,8 @@ void Matching_Pix_to_Ptcld::depth_callback(const sensor_msgs::Image::ConstPtr& m
 	}
 	//Access the pixel of interest
 	cv::Mat depth_image = cv_ptr->image;
-	float depth_value = depth_image.at<float>(uv_pix_.x,uv_pix_.y);  // access the depth value of the desired pixel
+	std::cout << type2str(depth_image.type()) << std::endl;
+	float depth_value = depth_image.at<uint16_t>(uv_pix_.x,uv_pix_.y) / 1000.0;  // Convert to meters
 	//If the pixel that was chosen has non-zero depth, then find the point projected along the ray at that depth value
 	if (depth_value == 0)
 	{

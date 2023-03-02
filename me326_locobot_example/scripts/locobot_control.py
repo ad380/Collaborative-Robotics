@@ -2,9 +2,9 @@
 
 import rospy
 import numpy as np
-import scipy as sp
+from scipy.linalg import logm
 
-from geometry_msgs.msg import Pose, Twist, Point
+from geometry_msgs.msg import Pose, Twist, Point, PoseStamped
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 import tf.transformations as tr
@@ -22,10 +22,11 @@ class LocobotControl(object):
         self.point_P_control_point_visual = rospy.Publisher("/locobot/mobile_base/control_point_P", Marker,queue_size=1) #this can then be visualized in RVIZ (ros visualization)
         self.target_pose_visual = rospy.Publisher("/locobot/mobile_base/target_pose_visual", Marker, queue_size=1)
 
-        self.L = 0.1 #this is the distance of the point P (x,y) that will be controlled for position. The locobot base_link frame points forward in the positive x direction, the point P will be on the positive x-axis in the body-fixed frame of the robot mobile base
+        self.L = 0.01 #this is the distance of the point P (x,y) that will be controlled for position. The locobot base_link frame points forward in the positive x direction, the point P will be on the positive x-axis in the body-fixed frame of the robot mobile base
 
-        self.odom_sub = rospy.Subscriber("/locobot/mobile_base/odom", Odometry, self.mobile_base_callback)
-        self.pose_sub = rospy.Subscriber("/locobot/mobile_base/goal_pose", Pose, self.go_to_pose)
+        # self.odom_sub = rospy.Subscriber("/locobot/mobile_base/odom", Odometry, self.mobile_base_callback)
+        self.mocap_sub = rospy.Subscriber("/vrpn_client_node/locobot_1/pose", PoseStamped, self.mocap_callback)
+        self.pose_sub = rospy.Subscriber("/locobot/move_base_simple/goal", PoseStamped, self.go_to_pose)
  
         #set targets for when a goal is reached: 
         self.goal_reached_error = 0.005
@@ -90,6 +91,11 @@ class LocobotControl(object):
         # Publish the marker
         self.target_pose_visual.publish(marker)
 
+    def mocap_callback(self, msg: PoseStamped):
+        odom = Odometry()
+        odom.header = msg.header
+        odom.pose.pose = msg.pose
+        self.mobile_base_callback(odom)
 
     def mobile_base_callback(self, data: Odometry):
         """
@@ -145,13 +151,13 @@ class LocobotControl(object):
         err_y = self.target_pose.position.y - point_P.y
         error_vect = np.array([err_x, err_y]) #this is a column vector (2x1); equivalently, we could use the transpose operator (.T): np.matrix([err_x ,err_y]).T  
 
-        Kp_mat = np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
+        Kp_mat = .5*np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
 
         #We will deal with this later (once we reached the position (x,y) goal), but we can calculate the angular error now - again this assumes there is only planar rotation about the z-axis, and the odom/baselink frames when aligned have x,y in the plane and z pointing upwards
         # Rotation_mat = np.matrix([[R11,R12],[R21,R22]])
         #We can use matrix logarithm (inverse or Rodrigues Formula and exponential map) to get an axis-angle representation:
-        axis_angle_mat = sp.linalg.logm(R[:3, :3])
-        
+        axis_angle_mat = logm(R[:3, :3])
+    
         # This is the angle error: how should frame Base move to go back to world frame?
         # angle_error = axis_angle_mat[0,1] #access the first row, second column to get angular error (skew sym matrix of the rotation axis - here only z component, then magnitude is angle error between the current pose and the world/odom pose which we will return to both at points A and B) 
         
@@ -207,10 +213,10 @@ class LocobotControl(object):
             target_pose.orientation.z = 0
             target_pose.orientation.w = 1 # cos(theta/2)
             self.target_pose = target_pose
-        elif type(target_pose) != Pose:
+        elif type(target_pose) != PoseStamped:
             rospy.logerr("Incorrect type for target pose, expects geometry_msgs Pose type") #send error msg if wrong type is send to go_to_pose
         else:
-            self.target_pose = target_pose
+            self.target_pose = target_pose.pose
         print("Received new goal:", self.target_pose.position.x, self.target_pose.position.y)
         self.reached = False
 
