@@ -145,7 +145,7 @@ class LocobotControl(object):
         err_y = self.target_pose.position.y - point_P.y
         error_vect = np.array([err_x, err_y]) #this is a column vector (2x1); equivalently, we could use the transpose operator (.T): np.matrix([err_x ,err_y]).T  
 
-        Kp_mat = 2*np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
+        Kp_mat = np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
 
         #We will deal with this later (once we reached the position (x,y) goal), but we can calculate the angular error now - again this assumes there is only planar rotation about the z-axis, and the odom/baselink frames when aligned have x,y in the plane and z pointing upwards
         # Rotation_mat = np.matrix([[R11,R12],[R21,R22]])

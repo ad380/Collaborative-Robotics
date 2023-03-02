@@ -26,7 +26,7 @@ class CubeDetector:
         mask_img : np.ndarray
             Image with just the selected color shown (either with true color or white mask)
         """    
-        # cv2.imwrite("raw_image.jpg", color_img)
+        cv2.imwrite("raw_image.jpg", color_img)
         
         #Step 1: Convert to HSV space; OpenCV uses - H: 0-179, S: 0-255, V: 0-255
         hsv_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2HSV)
@@ -46,7 +46,7 @@ class CubeDetector:
             low_H = 20
             high_H = 50
 
-        mask = cv2.inRange(hsv_img, (0, 0, 0), (255, 135, 255))
+        mask = cv2.inRange(hsv_img, (0, 0, 0), (255, 110, 255))
         mask = cv2.bitwise_not(mask)
         color_img = cv2.bitwise_and(color_img, color_img, mask=mask)
         cv2.imwrite("test.jpg", color_img)
@@ -57,9 +57,11 @@ class CubeDetector:
         peri = list(map(lambda c: cv2.arcLength(c, True), contours))
         ratio = np.divide(area, peri)
         idx = np.argpartition(ratio, -min(len(ratio), 4))[-4:]
-        filtered = np.array(contours)[idx]
+        filtered = np.array(contours)#[idx]
         mask = np.zeros_like(mask)
         mask = cv2.drawContours(mask, filtered, -1, 255, cv2.FILLED)
+        cv2.imwrite("filtered.jpg", mask)
+
         hsv_img = cv2.bitwise_and(hsv_img, hsv_img, mask=mask)
 
         #Step 3: Apply the mask; black region in the mask is 0, so when multiplied with original image removes all non-selected color 
