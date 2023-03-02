@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<launch>
+
+<group ns="locobot">
+    <param name="pt_srv_reg_pt_cld_topic" value="/locobot/camera/depth/color/points" />
+    <node type="matching_ptcld_serv" name="cube_position" pkg="me326_locobot_example" respawn="true" output="screen" />
+</group>
+
+</launch>
+
+

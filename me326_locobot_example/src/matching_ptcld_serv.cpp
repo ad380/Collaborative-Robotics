@@ -147,20 +147,20 @@ void Matching_Pix_to_Ptcld::info_callback(const sensor_msgs::CameraInfo::ConstPt
 
 void Matching_Pix_to_Ptcld::depth_callback(const sensor_msgs::Image::ConstPtr& msg){
 	//Take the depth message, using teh 32FC1 encoding and define the depth pointer
-	 cv_bridge::CvImageConstPtr cv_ptr;
-  try
-  {
-    cv_ptr = cv_bridge::toCvShare(msg, "32FC1");
-  }
-  catch (cv_bridge::Exception& e)
-  {
-    ROS_ERROR("cv_bridge exception: %s", e.what());
-    return;
-  }
-  //Access the pixel of interest
-  cv::Mat depth_image = cv_ptr->image;
-  float depth_value = depth_image.at<float>(uv_pix_.x,uv_pix_.y);  // access the depth value of the desired pixel
-  //If the pixel that was chosen has non-zero depth, then find the point projected along the ray at that depth value
+	cv_bridge::CvImageConstPtr cv_ptr;
+	try
+	{
+		cv_ptr = cv_bridge::toCvShare(msg, "32FC1");
+	}
+	catch (cv_bridge::Exception& e)
+	{
+		ROS_ERROR("cv_bridge exception: %s", e.what());
+		return;
+	}
+	//Access the pixel of interest
+	cv::Mat depth_image = cv_ptr->image;
+	float depth_value = depth_image.at<float>(uv_pix_.x,uv_pix_.y);  // access the depth value of the desired pixel
+	//If the pixel that was chosen has non-zero depth, then find the point projected along the ray at that depth value
 	if (depth_value == 0)
 	{
 		ROS_WARN("Skipping cause pixel had no depth");
@@ -188,6 +188,7 @@ void Matching_Pix_to_Ptcld::depth_callback(const sensor_msgs::Image::ConstPtr& m
 			} catch (tf2::TransformException &ex) {
 			    ROS_ERROR("%s", ex.what());
 			}
+			std::cout << "Got depth " << depth_value << " with ray " << ray << " and frame " << point_cloud_frame << std::endl;
 			// Transform a point cloud point
 			tf2::doTransform(point_3d_geom_msg, point_3d_cloud_, transform); // syntax: (points_in, points_out, transform)
 		}
