@@ -22,15 +22,17 @@ class LocobotControl(object):
         self.point_P_control_point_visual = rospy.Publisher("/locobot/mobile_base/control_point_P", Marker,queue_size=1) #this can then be visualized in RVIZ (ros visualization)
         self.target_pose_visual = rospy.Publisher("/locobot/mobile_base/target_pose_visual", Marker, queue_size=1)
 
-        self.L = 0.01 #this is the distance of the point P (x,y) that will be controlled for position. The locobot base_link frame points forward in the positive x direction, the point P will be on the positive x-axis in the body-fixed frame of the robot mobile base
+        self.L = 0.001 #this is the distance of the point P (x,y) that will be controlled for position. The locobot base_link frame points forward in the positive x direction, the point P will be on the positive x-axis in the body-fixed frame of the robot mobile base
 
         # self.odom_sub = rospy.Subscriber("/locobot/mobile_base/odom", Odometry, self.mobile_base_callback)
         self.mocap_sub = rospy.Subscriber("/vrpn_client_node/locobot_1/pose", PoseStamped, self.mocap_callback)
         self.pose_sub = rospy.Subscriber("/locobot/move_base_simple/goal", PoseStamped, self.go_to_pose)
  
         #set targets for when a goal is reached: 
-        self.goal_reached_error = 0.005
+        self.goal_reached_error = 0.05
+        self.heading_reached_error = .05
         self.reached = True
+        self.aligned = True
  
 
 
@@ -110,7 +112,7 @@ class LocobotControl(object):
         frequency we obtain the state information)
         """
 
-        if self.reached:
+        if self.reached and self.aligned:
             self.mobile_base_vel_publisher.publish(Twist())
             return
 
@@ -128,7 +130,9 @@ class LocobotControl(object):
         R12 = 2*qx*qz - 2*qw*qz
         R21 = 2*qx*qz + 2*qw*qz
         R22 = qw**2 - qx**2 + qy**2 -qz**2
-        R = tr.quaternion_matrix([qx, qy, qz, qw])
+        quat = [qx, qy, qz, qw]
+        yaw = tr.euler_from_quaternion(quat)[2]
+        R = tr.quaternion_matrix(quat)
         # print(R11, R[0, 0], R21, R[1, 0])
 
         P_body = np.array([self.L, 0, 0, 1])
@@ -151,19 +155,21 @@ class LocobotControl(object):
         err_y = self.target_pose.position.y - point_P.y
         error_vect = np.array([err_x, err_y]) #this is a column vector (2x1); equivalently, we could use the transpose operator (.T): np.matrix([err_x ,err_y]).T  
 
-        Kp_mat = .5*np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
+        Kp_mat = np.eye(2) #proportional gain matrix, diagonal with gain of 0.2 (for PID control)
 
         #We will deal with this later (once we reached the position (x,y) goal), but we can calculate the angular error now - again this assumes there is only planar rotation about the z-axis, and the odom/baselink frames when aligned have x,y in the plane and z pointing upwards
         # Rotation_mat = np.matrix([[R11,R12],[R21,R22]])
         #We can use matrix logarithm (inverse or Rodrigues Formula and exponential map) to get an axis-angle representation:
-        axis_angle_mat = logm(R[:3, :3])
+        axis_angle_mat = logm(R[:3, :3]) # w_hat
     
         # This is the angle error: how should frame Base move to go back to world frame?
         # angle_error = axis_angle_mat[0,1] #access the first row, second column to get angular error (skew sym matrix of the rotation axis - here only z component, then magnitude is angle error between the current pose and the world/odom pose which we will return to both at points A and B) 
         
         # This Angle is selected because its the frame rotation angle, how does Base appear from world?
         current_angle = axis_angle_mat[1,0] #this is also the angle about the z-axis of the base
-        Kp_angle_err = 0.2 #gain for angular error (here a scalar because we are only rotating about the z-axis)
+        Kp_angle_err = 2.0 #gain for angular error (here a scalar because we are only rotating about the z-axis)
+
+        desired_angle = tr.euler_from_quaternion([self.target_pose.orientation.x, self.target_pose.orientation.y, self.target_pose.orientation.z, self.target_pose.orientation.w])[2]
 
         '''
         We do not do perform derivative control here because we are doing velocity control, 
@@ -180,19 +186,34 @@ class LocobotControl(object):
         non_holonomic_mat = np.array([[np.cos(current_angle), -self.L*np.sin(current_angle)],[np.sin(current_angle),self.L*np.cos(current_angle)]])
         #Now perform inversion to find the forward velocity and angular velcoity of the mobile base.
         control_input = np.linalg.inv(non_holonomic_mat) @ point_p_error_signal #note: this matrix can always be inverted because the angle is L
+        if abs(control_input[0]) > 1:
+            control_input[0] = np.sign(control_input[0]) * 1
+        if abs(control_input[1]) > 1:
+            control_input[1] = np.sign(control_input[1]) * 1
+        
         #now let's turn this into the message type and publish it to the robot:
         control_msg = Twist()
         control_msg.linear.x = float(control_input[0]) #extract these elements then cast them in float type
-        control_msg.angular.z = float(control_input[1])
+        control_msg.angular.z = float(control_input[1]) #+ Kp_angle_err * (desired_angle - yaw)
+
+        if self.reached:
+            control_msg.linear.x = 0
+            control_msg.angular.z = Kp_angle_err * (desired_angle - yaw)
+            print("Yaw:", yaw, "Cur angle:", current_angle, "Desired angle:", desired_angle)
+        
         #now publish the control output:
         self.mobile_base_vel_publisher.publish(control_msg)
 
         #find the magnitude of the positional error to determine if its time to focus on orientation or switch targets
         err_magnitude = np.linalg.norm(error_vect)
    
-        if err_magnitude < self.goal_reached_error:
+        if not self.reached and err_magnitude < self.goal_reached_error:
             print("Reached target:", self.target_pose.position.x, self.target_pose.position.y)
             self.reached = True
+
+        if self.reached and abs(desired_angle - yaw) < self.heading_reached_error:
+            print("Aligned to target:", desired_angle * 180/np.pi, "deg")
+            self.aligned = True
 
         
 
@@ -219,6 +240,7 @@ class LocobotControl(object):
             self.target_pose = target_pose.pose
         print("Received new goal:", self.target_pose.position.x, self.target_pose.position.y)
         self.reached = False
+        self.aligned = False
 
 def main():
     rospy.init_node('locobot_control')
