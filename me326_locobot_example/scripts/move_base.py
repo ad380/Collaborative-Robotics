@@ -10,7 +10,7 @@ import numpy as np
 
 def main():
     locobot = InterbotixLocobotXS(robot_model="locobot_wx250s", arm_model="mobile_wx250s", use_move_base_action=False)
-    locobot.base.move_to_pose(1, 0, np.pi/2, True)
+    locobot.base.move_to_pose(1, -.4, -np.pi/2, True)
 
 
 if __name__=='__main__':

@@ -25,7 +25,7 @@ class LocobotControl(object):
         self.L = 0.001 #this is the distance of the point P (x,y) that will be controlled for position. The locobot base_link frame points forward in the positive x direction, the point P will be on the positive x-axis in the body-fixed frame of the robot mobile base
 
         # self.odom_sub = rospy.Subscriber("/locobot/mobile_base/odom", Odometry, self.mobile_base_callback)
-        self.mocap_sub = rospy.Subscriber("/vrpn_client_node/locobot_1/pose", PoseStamped, self.mocap_callback)
+        self.mocap_sub = rospy.Subscriber("/vrpn_client_node/locobot_2/pose", PoseStamped, self.mocap_callback)
         self.pose_sub = rospy.Subscriber("/locobot/move_base_simple/goal", PoseStamped, self.go_to_pose)
  
         #set targets for when a goal is reached: 
@@ -111,6 +111,8 @@ class LocobotControl(object):
         Note: this message topic /locobot/mobile_base/odom is published at about 30Hz, and we are using it to trigger our control script (so we control at the 
         frequency we obtain the state information)
         """
+
+        self.orient = data.pose.pose.orientation
 
         if self.reached and self.aligned:
             self.mobile_base_vel_publisher.publish(Twist())
@@ -238,6 +240,9 @@ class LocobotControl(object):
             rospy.logerr("Incorrect type for target pose, expects geometry_msgs Pose type") #send error msg if wrong type is send to go_to_pose
         else:
             self.target_pose = target_pose.pose
+            if target_pose.pose.orientation.w == 1:
+                self.target_pose.orientation = self.orient
+                
         print("Received new goal:", self.target_pose.position.x, self.target_pose.position.y)
         self.reached = False
         self.aligned = False

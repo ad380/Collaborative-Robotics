@@ -39,24 +39,28 @@ class PickUp:
     
     def move_arm(self, point: PointStamped):
         transformed_point = tf2_geometry_msgs.do_transform_point(point, self.transform)
-        print(transformed_point)
 
         #Home position
         self.locobot.arm.go_to_home_pose()
         self.locobot.gripper.open()
 
         transformed_point.point.x += .01
+
+        if transformed_point.point.z < -.1:
+            print("Z coordinate is too low! limiting it")
+            transformed_point.point.z = -.1
         
         #Move to block
         self.locobot.arm.set_ee_pose_components(x=transformed_point.point.x, y=transformed_point.point.y, z=.1, pitch=np.pi/2)
-        self.locobot.arm.set_ee_pose_components(x=transformed_point.point.x, y=transformed_point.point.y, z=transformed_point.point.z + .01, pitch=np.pi/2)
+        self.locobot.arm.set_ee_pose_components(x=transformed_point.point.x, y=transformed_point.point.y, z=transformed_point.point.z - .01, pitch=np.pi/2)
 
         #close gripper
-        self.locobot.gripper.set_pressure(1.0)
+        # self.locobot.gripper.set_pressure(1.0)
         self.locobot.gripper.close(2.0)
 
         #return home
         self.locobot.arm.go_to_sleep_pose()
+        rospy.sleep(3)
 
         #open gripper
         # self.locobot.gripper.open(2.0)
@@ -71,7 +75,7 @@ class PickUp:
 
 def main():
     node = PickUp()
-    rospy.Subscriber('/locobot/camera_cube_locator', Marker, node.cube_pickup_callback)
+    rospy.Subscriber('/locobot/camera_cube_locator', Marker, node.cube_pickup_callback, queue_size=1)
     rospy.spin()
 
 if __name__=='__main__':
